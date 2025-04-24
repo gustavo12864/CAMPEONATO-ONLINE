@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campeonato Online</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: url('https://cdn.cloudflare.steamstatic.com/steam/apps/1665460/ss_8f4e60b07a2f1e5c8cb1d5a34f7e7c49b3e0a0bb.1920x1080.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: white;
+    }
+    header {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      background: rgba(0, 0, 0, 0.75);
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+      border-radius: 8px;
+    }
+    input, select, button {
+      margin-top: 10px;
+      padding: 8px;
+      width: 100%;
+      border-radius: 4px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 5px 0;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.1);
+      margin-bottom: 5px;
+      border-radius: 5px;
+    }
+    #listaPartidas {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #listaPartidas li span {
+      display: inline-block;
+      min-width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Campeonato Online - eFootball 25</h1>
+  </header>
+  <main>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Efootball_2023_logo.svg/512px-Efootball_2023_logo.svg.png" alt="eFootball logo" style="width: 150px; display: block; margin: 0 auto 20px auto;">
+
+    <h2>Adicionar Jogador</h2>
+    <input type="text" id="nomeJogador" placeholder="Nome do jogador" />
+    <button onclick="adicionarJogador()">Adicionar</button>
+
+    <button onclick="atribuirTimesAosJogadores()">Atribuir Times do Brasileirão aos Jogadores</button>
+
+    <h2>Jogadores, Times e Pontuação</h2>
+    <ul id="listaJogadores"></ul>
+
+    <input type="hidden" id="tipoCampeonato" value="grupos">
+
+    <button onclick="sortearPartidas()">Sortear Partidas</button>
+    <h2>Partidas Sorteadas</h2>
+    <ul id="listaPartidas"></ul>
+    <h2>Final</h2>
+    <div id="final"></div>
+
+    <!-- Botão para gerar o PDF -->
+    <button onclick="gerarPDF()">Gerar PDF dos Confrontos</button>
+  </main>
+
+  <script>
+    const jogadores = [];
+    const partidas = [];
+
+    function adicionarJogador() {
+      const nome = document.getElementById('nomeJogador').value.trim();
+      if (nome) {
+        jogadores.push({ nome: nome, time: null, pontos: 0 });
+        atualizarListaJogadores();
+        document.getElementById('nomeJogador').value = '';
+      }
+    }
+
+    function atribuirTimesAosJogadores() {
+      const timesBrasileirao = [
+        "Flamengo", "Palmeiras", "São Paulo", "Corinthians",
+        "Grêmio", "Internacional", "Atlético-MG", "Cruzeiro",
+        "Fortaleza", "Ceará", "Bahia", "Vasco da Gama",
+        "Botafogo", "Santos", "Athletico-PR", "Goiás",
+        "Red Bull Bragantino", "Cuiabá", "América-MG", "Juventude"
+      ];
+      const embaralhados = timesBrasileirao.sort(() => Math.random() - 0.5);
+      jogadores.forEach((jogador, index) => {
+        jogador.time = embaralhados[index % embaralhados.length];
+      });
+      atualizarListaJogadores();
+    }
+
+    function atualizarListaJogadores() {
+      const ul = document.getElementById('listaJogadores');
+      ul.innerHTML = '';
+      jogadores.forEach(jogador => {
+        const li = document.createElement('li');
+        li.textContent = `${jogador.nome}${jogador.time ? ' - ' + jogador.time : ''} | Pontos: ${jogador.pontos}`;
+        ul.appendChild(li);
+      });
+    }
+
+    function sortearPartidas() {
+      const lista = document.getElementById('listaPartidas');
+      const finalDiv = document.getElementById('final');
+      lista.innerHTML = '';
+      finalDiv.innerHTML = '';
+      partidas.length = 0;
+
+      for (let i = 0; i < jogadores.length; i++) {
+        for (let j = i + 1; j < jogadores.length; j++) {
+          partidas.push({
+            jogadorA: jogadores[i],
+            jogadorB: jogadores[j],
+            placarA: 0,
+            placarB: 0,
+            index: partidas.length
+          });
+        }
+      }
+
+      partidas.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${p.jogadorA.nome} (${p.jogadorA.time || 'Sem Time'}) <input type='number' min='0' value='0' onchange='atualizarPlacar(${p.index}, "A", this.value)' style='width: 40px;'> x 
+          <input type='number' min='0' value='0' onchange='atualizarPlacar(${p.index}, "B", this.value)' style='width: 40px;'> ${p.jogadorB.nome} (${p.jogadorB.time || 'Sem Time'})</span>`;
+        lista.appendChild(li);
+      });
+    }
+
+    function atualizarPlacar(index, time, value) {
+      const partida = partidas[index];
+      if (partida) {
+        value = parseInt(value);
+        if (time === "A") partida.placarA = value;
+        else if (time === "B") partida.placarB = value;
+        calcularPontuacao();
+      }
+    }
+
+    function calcularPontuacao() {
+      jogadores.forEach(j => j.pontos = 0);
+      partidas.forEach(p => {
+        if (p.placarA > p.placarB) p.jogadorA.pontos += 3;
+        else if (p.placarA < p.placarB) p.jogadorB.pontos += 3;
+        else {
+          p.jogadorA.pontos += 1;
+          p.jogadorB.pontos += 1;
+        }
+      });
+      atualizarListaJogadores();
+      mostrarFinal();
+    }
+
+    function mostrarFinal() {
+      const finalDiv = document.getElementById('final');
+      const ordenados = [...jogadores].sort((a, b) => b.pontos - a.pontos);
+      if (ordenados.length >= 2) {
+        finalDiv.innerHTML = `<p><strong>Final:</strong> ${ordenados[0].nome} (${ordenados[0].pontos} pts) x ${ordenados[1].nome} (${ordenados[1].pontos} pts)</p>`;
+      }
+    }
+
+    // Função para gerar o PDF com os confrontos
+    function gerarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      
+      doc.text("Confrontos do Campeonato Online - eFootball 25", 20, 20);
+
+      let yPosition = 30;
+      partidas.forEach(p => {
+        const text = `${p.jogadorA.nome} (${p.jogadorA.time || 'Sem Time'}) x ${p.jogadorB.nome} (${p.jogadorB.time || 'Sem Time'})`;
+        doc.text(text, 20, yPosition);
+        yPosition += 10;
+      });
+
+      doc.save("confrontos_campeonato.pdf");
+    }
+  </script>
+</body>
+</html>
